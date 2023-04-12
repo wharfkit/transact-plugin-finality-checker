@@ -29,7 +29,7 @@ export class TransactPluginFinalityChecker extends AbstractTransactPlugin {
         // Register any desired afterBroadcast hooks
         context.addHook(
             TransactHookTypes.afterBroadcast,
-            (request, context): Promise<TransactHookResponseType> => {
+            (request, context): Promise<TransactHookResponseType> => new Promise((resolve, reject) => {                
                 if (!context.ui) {
                     throw new Error('UI not available')
                 }
@@ -69,14 +69,16 @@ export class TransactPluginFinalityChecker extends AbstractTransactPlugin {
                             this.log('Transaction finality reached')
 
                             prompt.cancel()
+
+                            resolve()
                         })
                         .catch((error) => {
                             this.log('Error while checking transaction finality', error)
+
+                            reject(error)
                         })
                 }, START_CHECKING_FINALITY_AFTER)
-
-                return Promise.resolve()
-            }
+            })
         )
     }
 
