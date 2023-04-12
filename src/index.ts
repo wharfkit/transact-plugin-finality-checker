@@ -4,6 +4,8 @@ import {
     TransactHookResponseType,
     TransactHookTypes,
     Transaction,
+    Cancelable,
+    PromptResponse,
 } from '@wharfkit/session'
 
 /** Import JSON localization strings */
@@ -11,20 +13,7 @@ import defaultTranslations from './translations.json'
 
 const START_CHECKING_FINALITY_AFTER = 150000 // 2.5 minutes
 
-interface TransactPluginFinalityCheckerOptions {
-    onFinalityCallback: () => void
-}
-
 export class TransactPluginFinalityChecker extends AbstractTransactPlugin {
-    onFinalityCallback: () => void
-
-    constructor({onFinalityCallback}: TransactPluginFinalityCheckerOptions) {
-        super()
-
-        // Optional - Set the default translations for the plugin
-        this.onFinalityCallback = onFinalityCallback
-    }
-
     /** A unique ID for this plugin */
     id = 'transact-plugin-finality-checker'
 
@@ -41,13 +30,40 @@ export class TransactPluginFinalityChecker extends AbstractTransactPlugin {
         context.addHook(
             TransactHookTypes.afterBroadcast,
             (request, context): Promise<TransactHookResponseType> => {
+
+                if (!context.ui) {
+                    throw new Error('UI not available')
+                }
+
+                const expectedFinalityTime = new Date(Date.now() + START_CHECKING_FINALITY_AFTER)
+
+                // Prompt the user with the link to view the transaction
+                const prompt: Cancelable<PromptResponse> = context.ui.prompt({
+                    title: t('title', {
+                        default: 'Transaction Broadcasted',
+                    }),
+                    body: t('body', {
+                        default:
+                            'Your transaction has been broadcast to the network, but is not yet irreversable.',
+                    }),
+                    elements: [
+                        {
+                            type: 'countdown',
+                            data: expectedFinalityTime.toISOString(),
+                        },
+                        {
+                            type: 'close',
+                        },
+                    ],
+                })
+
                 setTimeout(async () => {
                     this.log('Checking transaction finality')
                     waitForFinality(request.getRawTransaction(), context)
                         .then(() => {
                             this.log('Transaction finality reached')
 
-                            this.onFinalityCallback()
+                            prompt.cancel()
                         })
                         .catch((error) => {
                             this.log('Error while checking transaction finality', error)
