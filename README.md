@@ -1,4 +1,4 @@
-# @wharfkit/transact-plugin-template
+# @wharfkit/transact-plugin-finality-checker
 
 A template to create a `transactPlugin` for use during a `transact` call within the `@wharfkit/session` library.
 
