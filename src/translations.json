@@ -1,12 +1,10 @@
 {
-    "ko": {
-        "beforesign": "undefined beforeSign hook called from plugin template",
-        "aftersign": "undefined afterSign hook called from plugin template",
-        "afterbroadcast": "undefined afterBroadcast hook called from plugin template"
+    "en": {
+        "title": "Transaction Broadcasted",
+        "body": "Your transaction has been broadcast to the network, but is not yet irreversable.",
+        "countdown": "Finality expected in"
     },
-    "zh": {
-        "beforesign": "undefined beforeSign hook called from plugin template",
-        "aftersign": "undefined afterSign hook called from plugin template",
-        "afterbroadcast": "undefined afterBroadcast hook called from plugin template"
-    }
+    "ko": {},
+    "zh-Hans": {},
+    "zh-Hant": {}
 }

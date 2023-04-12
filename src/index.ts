@@ -30,10 +30,12 @@ export class TransactPluginFinalityChecker extends AbstractTransactPlugin {
         context.addHook(
             TransactHookTypes.afterBroadcast,
             (request, context): Promise<TransactHookResponseType> => {
-
                 if (!context.ui) {
                     throw new Error('UI not available')
                 }
+
+                // Retrieve translation helper from the UI, passing the app ID
+                const t = context.ui.getTranslate(this.id)
 
                 const expectedFinalityTime = new Date(Date.now() + START_CHECKING_FINALITY_AFTER)
 
@@ -49,6 +51,9 @@ export class TransactPluginFinalityChecker extends AbstractTransactPlugin {
                     elements: [
                         {
                             type: 'countdown',
+                            label: t('countdown', {
+                                default: 'Finality expected in',
+                            }),
                             data: expectedFinalityTime.toISOString(),
                         },
                         {
