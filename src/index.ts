@@ -39,25 +39,25 @@ export class TransactPluginFinalityChecker extends AbstractTransactPlugin {
 
                 const expectedFinalityTime = new Date(Date.now() + START_CHECKING_FINALITY_AFTER)
 
+                console.log({
+                    START_CHECKING_FINALITY_AFTER,
+                    expectedFinalityTime,
+                    iso: expectedFinalityTime.toISOString(),
+                })
+
                 // Prompt the user with the link to view the transaction
-                const prompt: Cancelable<PromptResponse> = context.ui.prompt({
+                context.ui.prompt({
                     title: t('title', {
-                        default: 'Transaction Broadcasted',
+                        default: 'Transaction is not yet final',
                     }),
                     body: t('body', {
                         default:
-                            'Your transaction has been broadcast to the network, but is not yet irreversable.',
+                            'Your transaction has been broadcasted to the network, but is still reversible. Finality expected in:',
                     }),
                     elements: [
                         {
                             type: 'countdown',
-                            label: t('countdown', {
-                                default: 'Finality expected in',
-                            }),
                             data: expectedFinalityTime.toISOString(),
-                        },
-                        {
-                            type: 'close',
                         },
                     ],
                 })
@@ -68,7 +68,20 @@ export class TransactPluginFinalityChecker extends AbstractTransactPlugin {
                         .then(() => {
                             this.log('Transaction finality reached')
 
-                            prompt.cancel()
+                             context.ui?.prompt({
+                                 title: t('title', {
+                                     default: 'Transaction is final',
+                                 }),
+                                 body: t('body', {
+                                     default:
+                                         'Your transaction has been broadcasted to the network and is now irrevirsible.',
+                                 }),
+                                 elements: [
+                                     {
+                                         type: 'close',
+                                     },
+                                 ],
+                             })
 
                             resolve()
                         })

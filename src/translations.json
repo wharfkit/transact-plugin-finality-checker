@@ -1,8 +1,13 @@
 {
     "en": {
-        "title": "Transaction Broadcasted",
-        "body": "Your transaction has been broadcast to the network, but is not yet irreversable.",
-        "countdown": "Finality expected in"
+        "reversible": {
+            "title": "Transaction is not yet final",
+            "body": "Your transaction has been broadcasted to the network, but is still revirsible. Finality expected in:"
+        },
+        "irrevirsible": {
+            "title": "Transaction is final",
+            "body": "Your transaction has been broadcasted to the network and is now irrevirsible."
+        }       
     },
     "ko": {},
     "zh-Hans": {},
