@@ -4,10 +4,21 @@ A template to create a `transactPlugin` for use during a `transact` call within 
 
 ## Usage
 
--   [Use this as a template.](https://docs.github.com/en/repositories/creating-and-managing-repositories/creating-a-repository-from-a-template)
--   Write your plugin's logic.
--   Publish it on Github or npmjs.com
--   Include it in your project and use it.
+Install the plugin:
+
+```bash
+yarn add @wharfkit/transact-plugin-finality-checker
+```
+
+Then use it when instantiating the `SessionKit`:
+
+```js
+new SessionKit(sessionArgs, {
+    ...
+    transactPlugins: [
+        new TransactPluginFinalityChecker(),
+    ],
+})
 
 ## Developing
 
