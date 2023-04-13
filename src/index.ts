@@ -4,8 +4,6 @@ import {
     TransactHookResponseType,
     TransactHookTypes,
     Transaction,
-    Cancelable,
-    PromptResponse,
 } from '@wharfkit/session'
 
 /** Import JSON localization strings */
@@ -29,69 +27,66 @@ export class TransactPluginFinalityChecker extends AbstractTransactPlugin {
         // Register any desired afterBroadcast hooks
         context.addHook(
             TransactHookTypes.afterBroadcast,
-            (request, context): Promise<TransactHookResponseType> => new Promise((resolve, reject) => {                
-                if (!context.ui) {
-                    throw new Error('UI not available')
-                }
+            (request, context): Promise<TransactHookResponseType> =>
+                new Promise((resolve, reject) => {
+                    if (!context.ui) {
+                        throw new Error('UI not available')
+                    }
 
-                // Retrieve translation helper from the UI, passing the app ID
-                const t = context.ui.getTranslate(this.id)
+                    // Retrieve translation helper from the UI, passing the app ID
+                    const t = context.ui.getTranslate(this.id)
 
-                const expectedFinalityTime = new Date(Date.now() + START_CHECKING_FINALITY_AFTER)
+                    const expectedFinalityTime = new Date(
+                        Date.now() + START_CHECKING_FINALITY_AFTER
+                    )
 
-                console.log({
-                    START_CHECKING_FINALITY_AFTER,
-                    expectedFinalityTime,
-                    iso: expectedFinalityTime.toISOString(),
+                    // Prompt the user with the link to view the transaction
+                    context.ui.prompt({
+                        title: t('title', {
+                            default: 'Transaction is not yet final',
+                        }),
+                        body: t('body', {
+                            default:
+                                'Your transaction has been broadcasted to the network, but is still reversible. Finality expected in:',
+                        }),
+                        elements: [
+                            {
+                                type: 'countdown',
+                                data: expectedFinalityTime.toISOString(),
+                            },
+                        ],
+                    })
+
+                    setTimeout(async () => {
+                        this.log('Checking transaction finality')
+                        waitForFinality(request.getRawTransaction(), context)
+                            .then(() => {
+                                this.log('Transaction finality reached')
+
+                                context.ui?.prompt({
+                                    title: t('title', {
+                                        default: 'Transaction is final',
+                                    }),
+                                    body: t('body', {
+                                        default:
+                                            'Your transaction has been broadcasted to the network and is now irrevirsible.',
+                                    }),
+                                    elements: [
+                                        {
+                                            type: 'close',
+                                        },
+                                    ],
+                                })
+
+                                resolve()
+                            })
+                            .catch((error) => {
+                                this.log('Error while checking transaction finality', error)
+
+                                reject(error)
+                            })
+                    }, START_CHECKING_FINALITY_AFTER)
                 })
-
-                // Prompt the user with the link to view the transaction
-                context.ui.prompt({
-                    title: t('title', {
-                        default: 'Transaction is not yet final',
-                    }),
-                    body: t('body', {
-                        default:
-                            'Your transaction has been broadcasted to the network, but is still reversible. Finality expected in:',
-                    }),
-                    elements: [
-                        {
-                            type: 'countdown',
-                            data: expectedFinalityTime.toISOString(),
-                        },
-                    ],
-                })
-
-                setTimeout(async () => {
-                    this.log('Checking transaction finality')
-                    waitForFinality(request.getRawTransaction(), context)
-                        .then(() => {
-                            this.log('Transaction finality reached')
-
-                             context.ui?.prompt({
-                                 title: t('title', {
-                                     default: 'Transaction is final',
-                                 }),
-                                 body: t('body', {
-                                     default:
-                                         'Your transaction has been broadcasted to the network and is now irrevirsible.',
-                                 }),
-                                 elements: [
-                                     {
-                                         type: 'close',
-                                     },
-                                 ],
-                             })
-
-                            resolve()
-                        })
-                        .catch((error) => {
-                            this.log('Error while checking transaction finality', error)
-
-                            reject(error)
-                        })
-                }, START_CHECKING_FINALITY_AFTER)
-            })
         )
     }
 
