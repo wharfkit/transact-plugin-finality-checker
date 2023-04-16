@@ -1,12 +1,15 @@
 {
-    "ko": {
-        "beforesign": "undefined beforeSign hook called from plugin template",
-        "aftersign": "undefined afterSign hook called from plugin template",
-        "afterbroadcast": "undefined afterBroadcast hook called from plugin template"
+    "en": {
+        "reversible": {
+            "title": "Transaction is not yet final",
+            "body": "Your transaction has been broadcasted to the network, but is still revirsible. Finality expected in:"
+        },
+        "irrevirsible": {
+            "title": "Transaction is final",
+            "body": "Your transaction has been broadcasted to the network and is now irrevirsible."
+        }       
     },
-    "zh": {
-        "beforesign": "undefined beforeSign hook called from plugin template",
-        "aftersign": "undefined afterSign hook called from plugin template",
-        "afterbroadcast": "undefined afterBroadcast hook called from plugin template"
-    }
+    "ko": {},
+    "zh-Hans": {},
+    "zh-Hant": {}
 }

@@ -1,49 +1,95 @@
-import {mockFetch} from '$test/utils/mock-fetch'
-import {TransactPluginTemplate} from '../../src/index'
+import {TransactContext, SigningRequest, Transaction} from '@wharfkit/session'
+import {expect} from 'chai'
+import sinon from 'sinon'
 
-import {Session, SessionArgs, SessionOptions} from '@wharfkit/session'
-import {WalletPluginPrivateKey} from '@wharfkit/wallet-plugin-privatekey'
+import {TransactPluginFinalityChecker} from '$lib'
+import { doesNotMatch } from 'assert'
 
-const wallet = new WalletPluginPrivateKey('5Jtoxgny5tT7NiNFp1MLogviuPJ9NniWjnU4wKzaX4t7pL4kJ8s')
+suite('TransactPluginFinalityChecker', () => {
+    let context: TransactContext
+    let request: SigningRequest
+    let finalityChecker: TransactPluginFinalityChecker
+    let hooks: Function[] = []
+    let promptsCalls = 0
+    let clock: sinon.SinonFakeTimers
 
-const mockSessionArgs: SessionArgs = {
-    chain: {
-        id: '73e4385a2708e6d7048834fbc1079f2fabb17b3c125b146af438971e90716c4d',
-        url: 'https://jungle4.greymass.com',
-    },
-    permissionLevel: 'wharfkit1131@test',
-    walletPlugin: wallet,
-}
-
-const mockSessionOptions: SessionOptions = {
-    fetch: mockFetch,
-    transactPlugins: [new TransactPluginTemplate()],
-}
-
-suite('example', function () {
-    test('plugin usage', async function () {
-        const session = new Session(mockSessionArgs, mockSessionOptions)
-        const action = {
-            authorization: [
-                {
-                    actor: 'wharfkit1115',
-                    permission: 'test',
+    function setupVariables() {
+        context = {
+            ui: {
+                prompt: () => {
+                    promptsCalls += 1
                 },
-            ],
-            account: 'eosio.token',
-            name: 'transfer',
-            data: {
-                from: 'wharfkit1115',
-                to: 'wharfkittest',
-                quantity: '0.0001 EOS',
-                memo: 'wharfkit plugin - resource provider test (maxFee: 0.0001)',
+                getTranslate: () => (key) => key,
             },
-        }
-        await session.transact(
-            {
-                action,
+            client: {
+                v1: {
+                    chain: {
+                        get_transaction_status: () => Promise.resolve({state: 'IRREVERSIBLE'}),
+                    },
+                },
             },
-            {broadcast: false}
-        )
+            addHook: (_, finalityPluginFn) => {
+                hooks.push(finalityPluginFn as Function)
+            },
+        } as unknown as TransactContext
+
+        request = {
+            getRawTransaction: () =>
+                ({
+                    id: 'transaction_id',
+                } as unknown as Transaction),
+        } as SigningRequest
+        
+        finalityChecker = new TransactPluginFinalityChecker()
+    }
+
+
+    function resetVariables() {
+        hooks = []
+        promptsCalls = 0
+    }
+
+    function executeAllHooks() {
+        return Promise.all(hooks.map(async (hookFunction) => {
+            try {
+                await hookFunction(request, context)
+            } catch(error) {
+                throw error
+            }
+        }))
+    }
+
+    setup(() => {
+        setupVariables()
+
+        clock = sinon.useFakeTimers()
+    })
+
+    teardown(() => {
+        clock.restore()
+    })
+
+    test('should register the afterBroadcast hook', () => {
+        resetVariables()
+
+        finalityChecker.register(context)
+
+        expect(hooks).to.have.length(1)
+    })
+
+    test('should call prompt method twice when the afterBroadcast hook is executed', (done) => {
+        resetVariables()
+
+        finalityChecker.register(context)
+
+        executeAllHooks().then(() => {
+            expect(promptsCalls).to.equal(2)
+            done()
+        })
+
+        expect(promptsCalls).to.equal(1)
+
+        // Simulate the passage of time to trigger the setTimeout behavior
+        clock.tick(200000)
     })
 })

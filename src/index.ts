@@ -3,14 +3,17 @@ import {
     TransactContext,
     TransactHookResponseType,
     TransactHookTypes,
+    Transaction,
 } from '@wharfkit/session'
 
 /** Import JSON localization strings */
 import defaultTranslations from './translations.json'
 
-export class TransactPluginTemplate extends AbstractTransactPlugin {
+const START_CHECKING_FINALITY_AFTER = 150000 // 2.5 minutes
+
+export class TransactPluginFinalityChecker extends AbstractTransactPlugin {
     /** A unique ID for this plugin */
-    id = 'transact-plugin-template'
+    id = 'transact-plugin-finality-checker'
 
     /** Optional - The translation strings to use for the plugin */
     translations = defaultTranslations
@@ -21,70 +24,103 @@ export class TransactPluginTemplate extends AbstractTransactPlugin {
      * @param context The TransactContext of the transaction being performed
      */
     register(context: TransactContext): void {
-        // Optional - Retrieve the translation function from the UI if it exists
-        let t
-        if (context.ui) {
-            t = context.ui.getTranslate()
-        }
-
-        // Register any desired beforeSign hooks
-        context.addHook(
-            TransactHookTypes.beforeSign,
-            async (request, context): Promise<TransactHookResponseType> => {
-                // If this plugin is interacting with the UI, throw an error since this is an undefined function
-                if (context.ui) {
-                    throw new Error(
-                        // Translate the error message against the given key or use the default value as English
-                        t('beforesign', {
-                            default: 'undefined beforeSign hook called from plugin template',
-                        })
-                    )
-                } else {
-                    // eslint-disable-next-line no-console
-                    console.log('undefined beforeSign hook called with', request, context)
-                }
-                return
-            }
-        )
-
-        // Register any desired afterSign hooks
-        context.addHook(
-            TransactHookTypes.afterSign,
-            async (request, context): Promise<TransactHookResponseType> => {
-                // If this plugin is interacting with the UI, throw an error since this is an undefined function
-                if (context.ui) {
-                    throw new Error(
-                        // Translate the error message against the given key or use the default value as English
-                        t('aftersign', {
-                            default: 'undefined afterSign hook called from plugin template',
-                        })
-                    )
-                } else {
-                    // eslint-disable-next-line no-console
-                    console.log('undefined afterSign hook called with', request, context)
-                }
-                return
-            }
-        )
-
         // Register any desired afterBroadcast hooks
         context.addHook(
             TransactHookTypes.afterBroadcast,
-            async (request, context): Promise<TransactHookResponseType> => {
-                // If this plugin is interacting with the UI, throw an error since this is an undefined function
-                if (context.ui) {
-                    throw new Error(
-                        // Translate the error message against the given key or use the default value as English
-                        t('afterbroadcast', {
-                            default: 'undefined afterBroadcast hook called from plugin template',
-                        })
+            (request, context): Promise<TransactHookResponseType> =>
+                new Promise((resolve, reject) => {
+                    if (!context.ui) {
+                        throw new Error('UI not available')
+                    }
+
+                    // Retrieve translation helper from the UI, passing the app ID
+                    const t = context.ui.getTranslate(this.id)
+
+                    const expectedFinalityTime = new Date(
+                        Date.now() + START_CHECKING_FINALITY_AFTER
                     )
-                } else {
-                    // eslint-disable-next-line no-console
-                    console.log('undefined afterBroadcast hook called with', request, context)
-                }
-                return
-            }
+
+                    // Prompt the user with the link to view the transaction
+                    context.ui.prompt({
+                        title: t('title', {
+                            default: 'Transaction is not yet final',
+                        }),
+                        body: t('body', {
+                            default:
+                                'Your transaction has been broadcasted to the network, but is still reversible. Finality expected in:',
+                        }),
+                        elements: [
+                            {
+                                type: 'countdown',
+                                data: expectedFinalityTime.toISOString(),
+                            },
+                        ],
+                    })
+
+                    setTimeout(async () => {
+                        this.log('Checking transaction finality')
+                        waitForFinality(request.getRawTransaction(), context)
+                            .then(() => {
+                                this.log('Transaction finality reached')
+
+                                context.ui?.prompt({
+                                    title: t('title', {
+                                        default: 'Transaction is final',
+                                    }),
+                                    body: t('body', {
+                                        default:
+                                            'Your transaction has been broadcasted to the network and is now irrevirsible.',
+                                    }),
+                                    elements: [
+                                        {
+                                            type: 'close',
+                                        },
+                                    ],
+                                })
+
+                                resolve()
+                            })
+                            .catch((error) => {
+                                this.log('Error while checking transaction finality', error)
+
+                                reject(error)
+                            })
+                    }, START_CHECKING_FINALITY_AFTER)
+                })
         )
     }
+
+    log(...args: any[]) {
+        // eslint-disable-next-line no-console
+        console.log('TransactPluginFinalityChecker, LOG:', ...args)
+    }
+}
+
+let retries = 0
+
+async function waitForFinality(transaction: Transaction, context: TransactContext): Promise<void> {
+    return new Promise((resolve, reject) => {
+        context.client.v1.chain
+            .get_transaction_status(transaction.id)
+            .then((response) => {
+                if (response.state === 'IRREVERSIBLE') {
+                    return resolve()
+                }
+
+                setTimeout(() => {
+                    waitForFinality(transaction, context).then(resolve).catch(reject)
+                }, 5000)
+            })
+            .catch((error) => {
+                if (error.response && error.response.status === 404 && retries < 3) {
+                    retries++
+
+                    setTimeout(() => {
+                        waitForFinality(transaction, context).then(resolve).catch(reject)
+                    }, 5000)
+                } else {
+                    reject(error)
+                }
+            })
+    })
 }
